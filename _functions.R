@@ -255,3 +255,4 @@ jerk <- function(xloc, yloc){
   b<-sqrt(a)*25/32.173*25*25 #(distance in feet per second)
   b
 }
+
