@@ -43,6 +43,16 @@ allFiles <- allFiles[1:3]
 #allFiles <- allFiles[1:1]  ##This is for testing
 
 pbp_all = read.csv(paste0(pathflpbp, "2015-16_pbp.csv"))
+pbp_all = pbp_all[c('GAME_ID','EVENTNUM','EVENTMSGTYPE','EVENTMSGACTIONTYPE','PERIOD','WCTIMESTRING',
+                         'PCTIMESTRING','HOMEDESCRIPTION','NEUTRALDESCRIPTION',
+                         'VISITORDESCRIPTION','SCORE',
+                         'SCOREMARGIN', 'PERSON1TYPE', 'PLAYER1_ID','PLAYER1_NAME','PLAYER1_TEAM_ID',
+                         'PLAYER1_TEAM_CITY','PLAYER1_TEAM_NICKNAME','PLAYER1_TEAM_ABBREVIATION',
+                         'PERSON2TYPE', 'PLAYER2_ID','PLAYER2_NAME','PLAYER2_TEAM_ID','PLAYER2_TEAM_CITY',
+                         'PLAYER2_TEAM_NICKNAME','PLAYER2_TEAM_ABBREVIATION','PERSON3TYPE', 'PLAYER3_ID',
+                         'PLAYER3_NAME','PLAYER3_TEAM_ID','PLAYER3_TEAM_CITY','PLAYER3_TEAM_NICKNAME',
+                         'PLAYER3_TEAM_ABBREVIATION')]
+
 
 storage = list(rep(0, length(allFiles)))
 ball_storage = list(rep(0, length(allFiles) * 50))
