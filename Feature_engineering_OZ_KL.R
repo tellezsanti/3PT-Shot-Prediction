@@ -8,6 +8,7 @@ source("_functions.R")
 library(iterators)
 library(stringr)
 library(lubridate)
+library(matlib)
 
 pathfl = "data/movement_data/"
 pathflpbp = "data/pbp/"  # Path to where you have play by play data stored (pbp)
@@ -23,7 +24,7 @@ insertRow <- function(existingDF, newrow, r) {
 }
 
 ##Select which files to run  . . . with 16GB of memory, I was not able to do all 631 games at once
-allFiles <- allFiles[1:3]
+allFiles <- allFiles[1:1]
 #allFiles <- allFiles[201:400]
 #allFiles <- allFiles[401:631]
 #allFiles <- allFiles[1:1]  ##This is for testing
@@ -172,7 +173,55 @@ for (filename in allFiles) {
     select(shot_id, EVENTMSGTYPE, game_clock, quarter, PLAYER1_ID,
            shot_clock) %>% arrange(quarter, desc(game_clock))
   
+  ########################################### Code by Keming ############################################
+  df_startshot$position <- 0
+  df_startshot$x_loc <- 0
+  df_startshot$y_loc <- 0
+  df_startshot$num_team <- 0
+  df_startshot$num_defen <- 0
+  df_startshot$angle <- 0
+  df_startshot$courtzone <- 0
   
+  for (i in 1:nrow(df_startshot)){
+    point = all.movements %>%
+      filter(game_clock == df_startshot$game_clock[i] & quarter == df_startshot$quarter[i])
+    point = distinct(point %>% select(-'event.id'))
+    target = point[which(df_startshot$PLAYER1_ID[i] == point$player_id),]
+    df_startshot$position[i] = target$position
+    df_startshot$x_loc[i] = target$x_loc
+    df_startshot$y_loc[i] = target$y_loc
+    # compute angle:
+    #basketball coordinates:  x:5.25, y:25
+    a = as.vector(c((target$x_loc-5.25),(target$y_loc-25)))
+    b = as.vector(c(-5.25,-25))
+    angle = (acos( sum(a*b) / ( sqrt(sum(a * a)) * sqrt(sum(b * b)) ) ))/pi * 180
+    df_startshot$angle[i] = angle
+    
+    teammate = point[point$team_id == target$team_id & point$player_id != -1,]
+    defenser = point[ -which(point$team_id == target$team_id | point$player_id == -1),]
+    c = 0
+    for (j in 1:nrow(teammate)){
+      if (((teammate$x_loc[j] - target$x_loc)**2 + (teammate$y_loc[j] - target$y_loc)**2) <= 25){
+        c = c + 1
+      }
+    }
+    df_startshot$num_team[i] = c-1
+    c = 0
+    for (j in 1:nrow(defenser)){
+      if (((defenser$x_loc[j] - target$x_loc)**2 + (defenser$y_loc[j] - target$y_loc)**2) <= 25){
+        c = c + 1
+      }
+    }
+    df_startshot$num_defen[i] = c
+  }
+  x_loc_trans = df_startshot$x_loc
+  df_startshot$x_loc = ifelse(x_loc_trans < 47, x_loc_trans, 94-x_loc_trans)
+  angle_trans = df_startshot$angle
+  df_startshot$angle = ifelse(angle_trans<=90,angle_trans,180-angle_trans)
+  df_startshot$court_zone = ifelse(df_startshot$angle<=30, 'Corner', df_startshot$angle)
+  df_startshot$court_zone = ifelse(df_startshot$angle>60, 'High', df_startshot$court_zone)
+  df_startshot$court_zone = ifelse(df_startshot$angle<=60&df_startshot$angle>30, 'Medium', df_startshot$court_zone)
+  #####################################################################################################
   ##loops through each three point play
   for (i in 1:nrow(df_startshot)) {
     
@@ -210,24 +259,24 @@ for (filename in allFiles) {
     }
   }
   
-  t = 40
-  
-  df_ball = df_total[df_total$player_id == -1, ]
-  # assuming in chronogical order
-  
-  store_coords = matrix(NA, nrow = length(unique(df_total$playid)), ncol = t * 3)
-  
-  for (shot in unique(df_ball$playid)) {
-    coords = ramify::flatten(as.matrix(df_ball[df_ball$playid == shot, c(7, 8, 9)]), across = "rows")
-    store_coords[shot, ] = coords[1:(t * 3)]
-  }
-  
-  # ball_storage[[n]] = store_coords
-  
-  write.csv(store_coords, paste0("GitHub/3PT-Shot-Prediction/trajetory/", as.character(gameid), ".csv"))
-  
-  # storage[[n]] = df_total
-  n = n + 1
+  # t = 40
+  # 
+  # df_ball = df_total[df_total$player_id == -1, ]
+  # # assuming in chronogical order
+  # 
+  # store_coords = matrix(NA, nrow = length(unique(df_total$playid)), ncol = t * 3)
+  # 
+  # for (shot in unique(df_ball$playid)) {
+  #   coords = ramify::flatten(as.matrix(df_ball[df_ball$playid == shot, c(7, 8, 9)]), across = "rows")
+  #   store_coords[shot, ] = coords[1:(t * 3)]
+  # }
+  # 
+  # # ball_storage[[n]] = store_coords
+  # 
+  # write.csv(store_coords, paste0("GitHub/3PT-Shot-Prediction/trajetory/", as.character(gameid), ".csv"))
+  # 
+  # # storage[[n]] = df_total
+  # n = n + 1
 }
 
 threes = plyr::rbind.fill(storage)
