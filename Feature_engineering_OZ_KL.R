@@ -1,32 +1,18 @@
 ## Get Three POint Shots
-
-# devtools::install_github("jimhester/archive")
-# library(archive)
 library(jsonlite)
-
 library(dplyr)
-# setwd("/media/ladmin/Data1/Code/basketball/Sportvu")
 library(foreach)
 library(doParallel)
 library(parallel)
-source("GitHub/3PT-Shot-Prediction/_functions.R")
+source("_functions.R")
 library(iterators)
 library(stringr)
 library(lubridate)
 
-# numCores <- detectCores()
-# cl <- makeCluster(numCores)
-# registerDoParallel(cl)
-
-# setwd(getSrcDirectory()[1])
-
-pathfl = "data/movement_data"
-pathjson = "./"
+pathfl = "data/movement_data/"
 pathflpbp = "data/pbp/"  # Path to where you have play by play data stored (pbp)
 
-allFiles = list.files(path = pathfl, pattern = "*.7z")  # Assuming files are in
-# data.frame format, but
-# compressed as *.gz files
+allFiles = list.files(path = pathfl, pattern = "*.json")  # Assuming all the files are already unzipped to Json file.
 
 # Simple Function needed during script
 insertRow <- function(existingDF, newrow, r) {
@@ -58,17 +44,12 @@ storage = list(rep(0, length(allFiles)))
 ball_storage = list(rep(0, length(allFiles) * 50))
 n = 1
 
-for (file in allFiles) {
+for (filename in allFiles) {
   #Load game data
-  # gameid <- gsub(".csv.gz", "", file)
-  # filen <- paste0(pathfl, file, sep = "")
-  # filep <- paste0(pathflpbp, gameid, "_pbp.txt", sep = "")
-  system(paste0("unar ", pathfl, file))
-  filename_json = list.files(pattern = "*.json")
-  all.movements = sportvu_convert_json(filename_json)
-  gameid <- sub("00", "", sub(".json", "", filename_json))
+  filepath = paste0(pathfl,filename)
+  all.movements = sportvu_convert_json(filepath)
+  gameid <- sub("00", "", sub(".json", "", filename))
   pbp = pbp_all[pbp_all$GAME_ID == as.integer(gameid), ]
-  file.remove(filename_json)
   df_total = NULL
   
   ##Filter down data to ball in the air
