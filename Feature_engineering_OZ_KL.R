@@ -298,8 +298,17 @@ for (filename in allFiles) {
   }
   Final_df = as.data.frame(store_coords)
   
+  cols = NULL
+  for (i in 1:(dim(final_df)[2]/3)){
+    for (j in c('X','Y','Z')){
+      col = paste0(j, i)
+      cols <- c(cols, col)
+    }
+  }
+  colnames(final_df) = cols
+  
   write.csv(store_coords, paste0("data/trajetory/", as.character(gameid), ".csv"))
-
+  
   n = n + 1
   toc()
   cat(paste0(filename, '| processing finished! Starting for next one.'))
