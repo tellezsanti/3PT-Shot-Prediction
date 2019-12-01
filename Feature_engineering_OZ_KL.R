@@ -25,7 +25,7 @@ insertRow <- function(existingDF, newrow, r) {
 }
 
 ##Select which files to run  . . . with 16GB of memory, I was not able to do all 631 games at once
-allFiles <- allFiles[1]
+# allFiles <- allFiles[1:5]
 #allFiles <- allFiles[201:400]
 #allFiles <- allFiles[401:631]
 #allFiles <- allFiles[1:1]  ##This is for testing
@@ -282,14 +282,13 @@ for (filename in allFiles) {
   # assuming in chronogical order
   unique_shots_id = unique(sumtotal3$shot_id)
   df_leave_first40 = data.frame()
+  
   for (i in unique_shots_id){
     trans = sumtotal3 %>% filter(shot_id==i)
     index = which(trans$threedist>22)[1] #first index where distance > 22
     trans = trans[index:(index+t),]
-    print(nrow(trans))
     df_leave_first40 = rbind(df_leave_first40,trans)
   }
-  
   
   store_coords = matrix(NA, nrow = length(unique_shots_id), ncol = t * 3)
   for (i in 1:length(unique_shots_id)) {
@@ -297,37 +296,43 @@ for (filename in allFiles) {
     store_coords[i, ] = coords[1:(t * 3)]
   }
   Final_df = as.data.frame(store_coords)
-  
   cols = NULL
-  for (i in 1:(dim(final_df)[2]/3)){
+  for (i in 1:(dim(Final_df)[2]/3)){
     for (j in c('X','Y','Z')){
       col = paste0(j, i)
       cols <- c(cols, col)
     }
   }
-  colnames(final_df) = cols
+  colnames(Final_df) = cols
+  df_startshot = df_startshot[order(match(df_startshot$shot_id,unique_shots_id)),]
+  Final_df = Final_df %>% mutate(court_zone = df_startshot$court_zone, position =  df_startshot$position,
+                      travel_distance = df_startshot$travel_distance, num_team = df_startshot$num_team, num_defen = df_startshot$num_defen)
   
-  write.csv(store_coords, paste0("data/trajetory/", as.character(gameid), ".csv"))
   
-  n = n + 1
+  
+  write.csv(Final_df, paste0("data/trajectory/", as.character(gameid), ".csv"), row.names = FALSE)
+
+  # n = n + 1
   toc()
   cat(paste0(filename, '| processing finished! Starting for next one.'))
 }
 
-threes = plyr::rbind.fill(storage)
 
-final <- threes %>%
-  arrange(gameid, playid, desc(game_clock)) #%>%
-# select(-X, --a_score, -h_score) %>%
-# arrange(gameid, playid, desc(game_clock))
 
-write.csv(final, "GitHub/3PT-Shot-Prediction/test.csv", row.names = FALSE)
-
-##Validate findings
-test <- final %>% group_by(gameid, playid) %>% summarize(count = n())
-summary(test$count)
-
-##Get specific plays
-testplay <- final %>% filter(gameid == '0021500418' & playid == '15')
-testplay <- final %>% filter(playid == '21')
-testplayball <- testplay %>% filter(player_id == '-1')
+# threes = plyr::rbind.fill(storage)
+# 
+# final <- threes %>%
+#   arrange(gameid, playid, desc(game_clock)) #%>%
+# # select(-X, --a_score, -h_score) %>%
+# # arrange(gameid, playid, desc(game_clock))
+# 
+# write.csv(final, "GitHub/3PT-Shot-Prediction/test.csv", row.names = FALSE)
+# 
+# ##Validate findings
+# test <- final %>% group_by(gameid, playid) %>% summarize(count = n())
+# summary(test$count)
+# 
+# ##Get specific plays
+# testplay <- final %>% filter(gameid == '0021500418' & playid == '15')
+# testplay <- final %>% filter(playid == '21')
+# testplayball <- testplay %>% filter(player_id == '-1')
