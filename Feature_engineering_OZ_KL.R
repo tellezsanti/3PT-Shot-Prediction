@@ -8,7 +8,8 @@ source("_functions.R")
 library(iterators)
 library(stringr)
 library(lubridate)
-library(matlib)
+require(tictoc)
+library(ramify)
 
 pathfl = "data/movement_data/"
 pathflpbp = "data/pbp/"  # Path to where you have play by play data stored (pbp)
@@ -24,7 +25,7 @@ insertRow <- function(existingDF, newrow, r) {
 }
 
 ##Select which files to run  . . . with 16GB of memory, I was not able to do all 631 games at once
-allFiles <- allFiles[1:1]
+allFiles <- allFiles[1]
 #allFiles <- allFiles[201:400]
 #allFiles <- allFiles[401:631]
 #allFiles <- allFiles[1:1]  ##This is for testing
@@ -44,11 +45,15 @@ pbp_all = pbp_all[c('GAME_ID','EVENTNUM','EVENTMSGTYPE','EVENTMSGACTIONTYPE','PE
 storage = list(rep(0, length(allFiles)))
 ball_storage = list(rep(0, length(allFiles) * 50))
 n = 1
-
+tic()
+cat('For Loop reading Json files starts now:')
 for (filename in allFiles) {
   #Load game data
   filepath = paste0(pathfl,filename)
   all.movements = sportvu_convert_json(filepath)
+  cat(paste0(filename,'| imported successfully'))
+  toc()
+  tic()
   gameid <- sub("00", "", sub(".json", "", filename))
   pbp = pbp_all[pbp_all$GAME_ID == as.integer(gameid), ]
   df_total = NULL
@@ -136,7 +141,6 @@ for (filename in allFiles) {
   pbp_shot$game_clock <- period_to_seconds(
     ms(as.character(pbp_shot$PCTIMESTRING)))
   
-  #unique(sumtotal2$shot_id)
   sumtotal3 <- NULL
   for (q in 1:4) {
     df_merge <- sumtotal %>% filter(quarter == q)
@@ -163,6 +167,7 @@ for (filename in allFiles) {
     }
   }
   sumtotal3 <- sumtotal3 %>% filter(EVENTMSGTYPE != '999')  # Remove any no
+  
   # match plays
   
   ##Now we have a dataframe of 3 point plays from when the ball leaves the shooters hand to when it reaches the basket
@@ -180,7 +185,7 @@ for (filename in allFiles) {
   df_startshot$num_team <- 0
   df_startshot$num_defen <- 0
   df_startshot$angle <- 0
-  df_startshot$courtzone <- 0
+  df_startshot$court_zone <- 0
   
   for (i in 1:nrow(df_startshot)){
     point = all.movements %>%
@@ -222,6 +227,8 @@ for (filename in allFiles) {
   df_startshot$court_zone = ifelse(df_startshot$angle>60, 'High', df_startshot$court_zone)
   df_startshot$court_zone = ifelse(df_startshot$angle<=60&df_startshot$angle>30, 'Medium', df_startshot$court_zone)
   #####################################################################################################
+  
+  
   ##loops through each three point play
   for (i in 1:nrow(df_startshot)) {
     
@@ -251,32 +258,51 @@ for (filename in allFiles) {
           mutate(x_loc = 94 - x_loc) %>% mutate(y_loc = 50 - y_loc)
       }
       df_play$gameid <- gameid
-      df_play$EVENTMSGTYPE <- df_startshot$EVENTMSGTYPE[i]  # Adding in some
-      # of the pbp
-      # data
+      df_play$EVENTMSGTYPE <- df_startshot$EVENTMSGTYPE[i]  # Adding in some of the pbp data
       df_play$PLAYER1_ID <- df_startshot$PLAYER1_ID[i]
+      df_play$shot_id_match_startshot <- df_startshot$shot_id[i]
       df_total <- bind_rows(df_total, df_play)
+      
+      #########################################################################################################
+      #Pancake's code to calculate the travel distance of the shooter:
+      travel_distance = df_play %>% filter(player_id == df_startshot$PLAYER1_ID[i])
+      sequence_cor = travel_distance %>% select(x_loc,y_loc) %>% mutate(lead_x=lead(x_loc,1), lead_y=lead(y_loc,1)) %>% 
+        mutate(diff_x = x_loc-lead_x, diff_y=y_loc-lead_y) %>% mutate(distance=sqrt(diff_x**2+diff_y**2))
+      distance = sum(sequence_cor$distance,na.rm = TRUE)
+      distance
+      df_startshot$travel_distance[i] <- distance
+      ###########################################################################################################
     }
   }
   
-  # t = 40
-  # 
-  # df_ball = df_total[df_total$player_id == -1, ]
-  # # assuming in chronogical order
-  # 
-  # store_coords = matrix(NA, nrow = length(unique(df_total$playid)), ncol = t * 3)
-  # 
-  # for (shot in unique(df_ball$playid)) {
-  #   coords = ramify::flatten(as.matrix(df_ball[df_ball$playid == shot, c(7, 8, 9)]), across = "rows")
-  #   store_coords[shot, ] = coords[1:(t * 3)]
-  # }
-  # 
-  # # ball_storage[[n]] = store_coords
-  # 
-  # write.csv(store_coords, paste0("GitHub/3PT-Shot-Prediction/trajetory/", as.character(gameid), ".csv"))
-  # 
-  # # storage[[n]] = df_total
-  # n = n + 1
+  
+  
+  
+  t = 35
+  # assuming in chronogical order
+  unique_shots_id = unique(sumtotal3$shot_id)
+  df_leave_first40 = data.frame()
+  for (i in unique_shots_id){
+    trans = sumtotal3 %>% filter(shot_id==i)
+    index = which(trans$threedist>22)[1] #first index where distance > 22
+    trans = trans[index:(index+t),]
+    print(nrow(trans))
+    df_leave_first40 = rbind(df_leave_first40,trans)
+  }
+  
+  
+  store_coords = matrix(NA, nrow = length(unique_shots_id), ncol = t * 3)
+  for (i in 1:length(unique_shots_id)) {
+    coords = ramify::flatten(as.matrix(df_leave_first40 %>% filter(shot_id == unique_shots_id[i]) %>% select(x_loc,y_loc,radius)), across = "rows")
+    store_coords[i, ] = coords[1:(t * 3)]
+  }
+  Final_df = as.data.frame(store_coords)
+  
+  write.csv(store_coords, paste0("data/trajetory/", as.character(gameid), ".csv"))
+
+  n = n + 1
+  toc()
+  cat(paste0(filename, '| processing finished! Starting for next one.'))
 }
 
 threes = plyr::rbind.fill(storage)
