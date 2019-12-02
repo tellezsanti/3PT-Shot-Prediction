@@ -25,7 +25,7 @@ insertRow <- function(existingDF, newrow, r) {
 }
 
 ##Select which files to run  . . . with 16GB of memory, I was not able to do all 631 games at once
-# allFiles <- allFiles[1:5]
+allFiles <- allFiles[11:30]
 #allFiles <- allFiles[201:400]
 #allFiles <- allFiles[401:631]
 #allFiles <- allFiles[1:1]  ##This is for testing
@@ -44,11 +44,10 @@ pbp_all = pbp_all[c('GAME_ID','EVENTNUM','EVENTMSGTYPE','EVENTMSGACTIONTYPE','PE
 
 storage = list(rep(0, length(allFiles)))
 ball_storage = list(rep(0, length(allFiles) * 50))
-n = 1
-tic()
 cat('For Loop reading Json files starts now:')
 for (filename in allFiles) {
   #Load game data
+  tic()
   filepath = paste0(pathfl,filename)
   all.movements = sportvu_convert_json(filepath)
   cat(paste0(filename,'| imported successfully'))
@@ -186,12 +185,15 @@ for (filename in allFiles) {
   df_startshot$num_defen <- 0
   df_startshot$angle <- 0
   df_startshot$court_zone <- 0
+  df_startshot$travel_distance <- 0
+  df_startshot$travel_speed <- 0
   
   for (i in 1:nrow(df_startshot)){
     point = all.movements %>%
-      filter(game_clock == df_startshot$game_clock[i] & quarter == df_startshot$quarter[i])
-    point = distinct(point %>% select(-'event.id'))
+      filter(game_clock == df_startshot$game_clock[i] & quarter == df_startshot$quarter[i]) %>% 
+      distinct(player_id,quarter, game_clock, .keep_all = TRUE)
     target = point[which(df_startshot$PLAYER1_ID[i] == point$player_id),]
+    if (nrow(target)==0) next
     df_startshot$position[i] = target$position
     df_startshot$x_loc[i] = target$x_loc
     df_startshot$y_loc[i] = target$y_loc
@@ -227,7 +229,6 @@ for (filename in allFiles) {
   df_startshot$court_zone = ifelse(df_startshot$angle>60, 'High', df_startshot$court_zone)
   df_startshot$court_zone = ifelse(df_startshot$angle<=60&df_startshot$angle>30, 'Medium', df_startshot$court_zone)
   #####################################################################################################
-  
   
   ##loops through each three point play
   for (i in 1:nrow(df_startshot)) {
@@ -269,10 +270,18 @@ for (filename in allFiles) {
       sequence_cor = travel_distance %>% select(x_loc,y_loc) %>% mutate(lead_x=lead(x_loc,1), lead_y=lead(y_loc,1)) %>% 
         mutate(diff_x = x_loc-lead_x, diff_y=y_loc-lead_y) %>% mutate(distance=sqrt(diff_x**2+diff_y**2))
       distance = sum(sequence_cor$distance,na.rm = TRUE)
-      distance
       df_startshot$travel_distance[i] <- distance
       ###########################################################################################################
     }
+    # Calculate the speed of the shooter
+    cal_speed <- sum(all.movements %>%
+                       filter(quarter == df_startshot$quarter[i] &
+                                game_clock >= df_startshot$game_clock[i] & game_clock <= (df_startshot$game_clock[i]+2)) %>% 
+                       distinct(player_id, quarter, game_clock, .keep_all = TRUE) %>% 
+                       filter(player_id == df_startshot$PLAYER1_ID[i]) %>% mutate(lead_x=lead(x_loc,1), lead_y=lead(y_loc,1)) %>% 
+                       mutate(diff_x = x_loc-lead_x, diff_y=y_loc-lead_y) %>% mutate(distance=sqrt(diff_x**2+diff_y**2)) %>% select(distance),na.rm = TRUE)/2
+    df_startshot$travel_speed[i] <- cal_speed
+    ###########################################################################################################
   }
   
   
@@ -306,7 +315,8 @@ for (filename in allFiles) {
   colnames(Final_df) = cols
   df_startshot = df_startshot[order(match(df_startshot$shot_id,unique_shots_id)),]
   Final_df = Final_df %>% mutate(court_zone = df_startshot$court_zone, position =  df_startshot$position,
-                      travel_distance = df_startshot$travel_distance, num_team = df_startshot$num_team, num_defen = df_startshot$num_defen)
+                      travel_distance = df_startshot$travel_distance,travel_speed = df_startshot$travel_speed, 
+                      num_team = df_startshot$num_team, num_defen = df_startshot$num_defen, Result = df_startshot$EVENTMSGTYPE)
   
   
   
