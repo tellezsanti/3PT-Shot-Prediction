@@ -273,15 +273,25 @@ for (filename in allFiles) {
       df_startshot$travel_distance[i] <- distance
       ###########################################################################################################
     }
-    # Calculate the speed of the shooter
-    cal_speed <- sum(all.movements %>%
-                       filter(quarter == df_startshot$quarter[i] &
-                                game_clock >= df_startshot$game_clock[i] & game_clock <= (df_startshot$game_clock[i]+2)) %>% 
-                       distinct(player_id, quarter, game_clock, .keep_all = TRUE) %>% 
-                       filter(player_id == df_startshot$PLAYER1_ID[i]) %>% mutate(lead_x=lead(x_loc,1), lead_y=lead(y_loc,1)) %>% 
-                       mutate(diff_x = x_loc-lead_x, diff_y=y_loc-lead_y) %>% mutate(distance=sqrt(diff_x**2+diff_y**2)) %>% select(distance),na.rm = TRUE)/2
-    df_startshot$travel_speed[i] <- cal_speed
+    # # Calculate the speed of the shooter
+    # cal_speed <- sum(all.movements %>%
+    #                    filter(quarter == df_startshot$quarter[i] &
+    #                             game_clock >= df_startshot$game_clock[i] & game_clock <= (df_startshot$game_clock[i]+2)) %>% 
+    #                    distinct(player_id, quarter, game_clock, .keep_all = TRUE) %>% 
+    #                    filter(player_id == df_startshot$PLAYER1_ID[i]) %>% mutate(lead_x=lead(x_loc,1), lead_y=lead(y_loc,1)) %>% 
+    #                    mutate(diff_x = x_loc-lead_x, diff_y=y_loc-lead_y) %>% mutate(distance=sqrt(diff_x**2+diff_y**2)) %>% select(distance),na.rm = TRUE)/2
+    # df_startshot$travel_speed[i] <- cal_speed
     ###########################################################################################################
+    # Calculate the speed of the shooter
+    player_this_moment = all.movements %>%
+      filter(quarter == df_startshot$quarter[i] &
+               game_clock >= df_startshot$game_clock[i] & game_clock <= (df_startshot$game_clock[i]+2)) %>% 
+      distinct(player_id, quarter, game_clock, .keep_all = TRUE)
+    if((df_startshot$PLAYER1_ID[i] %in% player_this_moment$player_id)){
+      cal_speed <- sum(player_this_moment %>% filter(player_id == df_startshot$PLAYER1_ID[i]) %>% mutate(lead_x=lead(x_loc,1), lead_y=lead(y_loc,1)) %>% 
+                         mutate(diff_x = x_loc-lead_x, diff_y=y_loc-lead_y) %>% mutate(distance=sqrt(diff_x**2+diff_y**2)) %>% select(distance),na.rm = TRUE)/2
+      df_startshot$travel_speed[i] <- cal_speed
+    }
   }
   
   
